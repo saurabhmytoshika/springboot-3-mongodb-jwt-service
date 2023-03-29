@@ -1,0 +1,78 @@
+# Java code to convert Int to Enum and Enum to Int in MongoDB
+==================================================================================================================
+ 1. EnumToIntegerConverter
+public class IntegerEnumConverters {
+    @WritingConverter
+    public static class EnumToIntegerConverter implements Converter<Enum<?>, Integer> {
+        @Override
+        public Integer convert(Enum<?> source) {
+            if(source instanceof IntEnumConvertable) return ((IntEnumConvertable)(source)).getValue();
+            else 0
+        }
+    }
+ }
+==================================================================================================================
+2. IntegerToEnumConverterFactory
+public class IntegerToEnumConverterFactory implements ConverterFactory<Integer, Enum> {
+           @Override
+           public <T extends Enum> Converter<Integer, T> getConverter(Class<T> targetType) {
+               Class<?> enumType = targetType;
+               while (enumType != null && !enumType.isEnum()) {
+                   enumType = enumType.getSuperclass();
+               }
+               if (enumType == null) {
+                   throw new IllegalArgumentException(
+                           "The target type " + targetType.getName() + " does not refer to an enum");
+               }
+               return new IntegerToEnum(enumType);
+           }
+           @ReadingConverter
+           public static class IntegerToEnum<T extends Enum>  implements Converter<Integer, Enum> {
+               private final Class<T> enumType;
+
+               public IntegerToEnum(Class<T> enumType) {
+                   this.enumType = enumType;
+               }
+
+               @Override
+               public Enum convert(Integer source) {
+                     for(T t : enumType.getEnumConstants()) {
+                         if(t instanceof IntEnumConvertable)
+                         {
+                             if(((IntEnumConvertable)t).getValue() == source.intValue()) {
+                                   return t;
+                               }
+                         }
+                       }
+                       return null;
+               }
+           }
+}
+==================================================================================================================
+3. MongoDB config file
+@Configuration
+class MongoDBConfig {
+    @Bean
+     public CustomConversions customConversions() {
+     List<Converter<?, ?>> converters = new ArrayList<Converter<?, ?>>();
+     converters.add(new IntegerEnumConverters.EnumToIntegerConverter());
+//   this is a dummy registration , actually it's a work-around because
+//   spring-mongodb doesnt has the option to reg converter factory.
+//   so we reg the converter that our factory uses.
+     converters.add(new IntegerToEnumConverterFactory.IntegerToEnum(null));
+            return new CustomConversions(converters);
+        }
+
+    @Bean
+    public MappingMongoConverter mappingMongoConverter() throws Exception {
+        MongoMappingContext mappingContext = new MongoMappingContext();
+        mappingContext.setApplicationContext(appContext);
+        DbRefResolver dbRefResolver = new DefaultDbRefResolver(mongoDbFactory());
+        MappingMongoConverter mongoConverter = new MappingMongoConverter(dbRefResolver, mappingContext);
+        mongoConverter.setCustomConversions(customConversions());
+        ConversionService convService = mongoConverter.getConversionService();
+        ((GenericConversionService)convService).addConverterFactory(new IntegerToEnumConverterFactory());
+        mongoConverter.afterPropertiesSet();
+        return mongoConverter;
+    }
+}
