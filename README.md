@@ -1,5 +1,5 @@
 # Introduction 
-Simple SpringBoot 3.* Project with MongoDB with JWT token implementation.
+Simple SpringBoot 3.* in Kotlin Project with MongoDB with JWT token implementation.
 
 # Getting Started
 TODO: Guide users through getting your code up and running on their own system. In this section you can talk about:
